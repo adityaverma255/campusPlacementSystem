@@ -1,6 +1,7 @@
 /**
- * domain/user/models.ts
+ * domain/models.ts
  */
+import type { EligibilityRule } from '../engines/rule-engine/types';
 
 export interface StudentProfile {
     id: string;
@@ -10,14 +11,9 @@ export interface StudentProfile {
     branch: string;
     graduation_year: number;
     backlog_count: number;
-    skills: string[];
+    skills: string[]; // e.g. ["Python", "Java", "React"]
     resume_url: string;
 }
-
-/**
- * domain/drive/models.ts
- */
-import type { EligibilityRule } from '../engines/rule-engine/types';
 
 export enum DriveStatus {
     OPEN = 'OPEN',
@@ -64,26 +60,21 @@ export interface AuditLog {
 export interface PlacementDrive {
     id: string;
     companyId: string;
+    companyName: string; // Added
     roleTitle: string;
     description: string;
+    requiredSkills: string[]; // Added
     eligibilityRules: EligibilityRule[];
     selectionRounds: SelectionRound[];
     status: DriveStatus;
 
-    // SECTION 1: Scoring Config
     scoringWeights?: WeightConfig[];
-
-    // SECTION 3: Screening
     screeningQuestions?: PreScreeningQuestion[];
 
-    // SECTION 9: Governance
     version: number;
     isFrozen: boolean;
 }
 
-/**
- * domain/application/models.ts
- */
 export enum ApplicationStatus {
     APPLIED = 'APPLIED',
     ELIGIBLE = 'ELIGIBLE',
@@ -114,16 +105,13 @@ export interface Application {
     driveId: string;
     currentStatus: ApplicationStatus;
 
-    // Explanations
     eligibilityExplanation?: any;
     scoringExplanation?: ScoreBreakdown[];
     screeningExplanation?: string[];
 
-    // Data
     roundProgress: RoundStatus[];
     screeningResponses?: Record<string, any>;
     compositeScore?: number;
 
-    // Governance
     versionAppliedTo: number;
 }

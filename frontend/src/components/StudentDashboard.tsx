@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { mockDrives, mockStudent } from '../mockData';
+import { mockStudent, mockDrives } from '../mockData';
 import type { StudentProfile, Application } from '../domain/models';
 import { PlacementService } from '../services/placement.service';
 import { RecommendationEngine, Recommendation } from '../engines/analytics-engine/recommendation';
 
 const StudentDashboard = ({ service }: { service: PlacementService }) => {
-    const [profile] = useState<StudentProfile>(mockStudent);
+    const [profile, setProfile] = useState<StudentProfile>(mockStudent);
     const [activeTab, setActiveTab] = useState<'EXPLORE' | 'MY_APPLICATIONS' | 'RECOMMENDED'>('EXPLORE');
     const [applications, setApplications] = useState<Application[]>([]);
     const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
@@ -17,8 +17,6 @@ const StudentDashboard = ({ service }: { service: PlacementService }) => {
     }, [profile, service]);
 
     const handleApply = (driveId: string) => {
-        // In enterprise mode, we would show a pre-screening questionnaire here.
-        // For this demo, we simulate a mock response.
         const mockResponses = { 'Q1': 'Yes' };
         const app = service.applyToDrive(profile, driveId, mockResponses);
         setApplications(prev => [...prev, app]);
@@ -48,7 +46,26 @@ const StudentDashboard = ({ service }: { service: PlacementService }) => {
                     </div>
                     <div className="stat-item">
                         <label>Skills</label>
-                        <p>{profile.skills.length}</p>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', marginTop: '0.5rem' }}>
+                            {profile.skills.map(s => (
+                                <span key={s} className="tag secondary" style={{ fontSize: '0.7rem' }}>{s}</span>
+                            ))}
+                        </div>
+                        {editingProfile && (
+                            <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+                                <input id="newSkill" placeholder="+ Skill" className="glass-card" style={{ padding: '0.2rem', width: '80px', color: 'white' }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            const val = (e.target as HTMLInputElement).value;
+                                            if (val && !profile.skills.includes(val)) {
+                                                setProfile({ ...profile, skills: [...profile.skills, val] });
+                                                (e.target as HTMLInputElement).value = '';
+                                            }
+                                        }
+                                    }}
+                                />
+                            </div>
+                        )}
                     </div>
                     <div className="stat-item">
                         <label>Apps</label>
@@ -67,12 +84,19 @@ const StudentDashboard = ({ service }: { service: PlacementService }) => {
                 <div className="grid">
                     {mockDrives.map(drive => (
                         <div key={drive.id} className="glass-card drive-card">
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                <span className="tag" style={{ border: '1px solid var(--primary)', fontSize: '0.7rem' }}>{drive.companyName}</span>
+                            </div>
                             <h3>{drive.roleTitle}</h3>
-                            <p style={{ margin: '0.5rem 0', opacity: 0.7 }}>{drive.description}</p>
+                            <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                                {drive.requiredSkills.map(s => <span key={s} style={{ fontSize: '0.6rem', opacity: 0.6 }}>#{s}</span>)}
+                            </div>
+                            <p style={{ margin: '1rem 0', opacity: 0.7, fontSize: '0.85rem' }}>{drive.description}</p>
                             <div style={{ marginTop: '1rem' }}>
                                 <button
                                     onClick={() => handleApply(drive.id)}
                                     disabled={applications.some(a => a.driveId === drive.id)}
+                                    style={{ width: '100%' }}
                                 >
                                     {applications.some(a => a.driveId === drive.id) ? 'Applied' : 'Apply Now'}
                                 </button>
@@ -92,8 +116,9 @@ const StudentDashboard = ({ service }: { service: PlacementService }) => {
                                     <h3>{drive?.roleTitle}</h3>
                                     <span className="tag" style={{ background: 'var(--primary)' }}>{rec.matchScore}% Match</span>
                                 </div>
+                                <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '0.25rem' }}>@{drive?.companyName}</p>
                                 <p style={{ margin: '1rem 0', fontSize: '0.85rem' }}>{rec.explanation}</p>
-                                <button onClick={() => handleApply(rec.driveId)}>Quick Apply</button>
+                                <button onClick={() => handleApply(rec.driveId)} style={{ width: '100%' }}>Quick Apply</button>
                             </div>
                         );
                     })}
@@ -114,7 +139,7 @@ const StudentDashboard = ({ service }: { service: PlacementService }) => {
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <div>
                                             <h3 style={{ fontSize: '1.2rem' }}>{drive?.roleTitle}</h3>
-                                            <p style={{ opacity: 0.6 }}>Applied on {new Date().toLocaleDateString()}</p>
+                                            <p style={{ opacity: 0.6 }}>{drive?.companyName} • Applied on {new Date().toLocaleDateString()}</p>
                                         </div>
                                         <div style={{ textAlign: 'right' }}>
                                             <div className="tag" style={{ background: 'var(--primary)', color: 'white' }}>{app.currentStatus}</div>
@@ -122,7 +147,6 @@ const StudentDashboard = ({ service }: { service: PlacementService }) => {
                                         </div>
                                     </div>
 
-                                    {/* SECTION 1: Elastic Scoring Breakdown */}
                                     {app.scoringExplanation && (
                                         <div style={{ marginTop: '1rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px' }}>
                                             <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>Explorable Scoring Breakdown</h4>
@@ -136,7 +160,6 @@ const StudentDashboard = ({ service }: { service: PlacementService }) => {
                                         </div>
                                     )}
 
-                                    {/* Eligibility Explanation */}
                                     <div style={{ marginTop: '1.5rem' }}>
                                         <h4 style={{ marginBottom: '1rem' }}>Transparency Feed</h4>
                                         <div className="logic-tree">
@@ -146,30 +169,6 @@ const StudentDashboard = ({ service }: { service: PlacementService }) => {
                                                     <div className="logic-content">
                                                         <p style={{ fontWeight: 600 }}>{res.field} {res.operator} {res.expectedValue}</p>
                                                         <p style={{ fontSize: '0.8rem', opacity: 0.7 }}>Actual: {res.actualValue} • {res.explanation}</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {app.screeningExplanation?.map((msg, idx) => (
-                                                <div key={idx} className="logic-branch passed">
-                                                    <div className="logic-symbol">ℹ</div>
-                                                    <div className="logic-content">
-                                                        <p>{msg}</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Selection Path */}
-                                    <div style={{ marginTop: '2rem' }}>
-                                        <h4 style={{ marginBottom: '1rem' }}>Selection Path</h4>
-                                        <div style={{ display: 'flex', gap: '1rem' }}>
-                                            {app.roundProgress.map((round, idx) => (
-                                                <div key={idx} className={`round-indicator ${round.status.toLowerCase()}`}>
-                                                    <div className="round-dot"></div>
-                                                    <div className="round-info">
-                                                        <p style={{ fontWeight: 600, fontSize: '0.85rem' }}>{round.roundId}</p>
-                                                        <p style={{ fontSize: '0.75rem' }}>{round.status}</p>
                                                     </div>
                                                 </div>
                                             ))}

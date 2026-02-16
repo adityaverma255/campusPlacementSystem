@@ -4,17 +4,31 @@ import './index.css';
 
 import StudentDashboard from './components/StudentDashboard';
 import CompanyPortal from './components/CompanyPortal';
+import LoginPage from './components/LoginPage';
 import { PlacementService } from './services/placement.service';
+import { AuthService, User } from './services/auth.service';
 import { mockDrives } from './mockData';
 
 function App() {
-  const [role, setRole] = useState<'STUDENT' | 'COMPANY'>('STUDENT');
+  const [user, setUser] = useState<User | null>(AuthService.getCurrentUser());
 
   const service = useMemo(() => {
     const s = new PlacementService();
-    mockDrives.forEach(d => s.createDrive(d));
+    // Only seed if empty
+    if (s?.getApplicationsForDrive('').length === 0) {
+      mockDrives.forEach(d => s.createDrive(d));
+    }
     return s;
   }, []);
+
+  const handleLogout = () => {
+    AuthService.logout();
+    setUser(null);
+  };
+
+  if (!user) {
+    return <LoginPage onLogin={setUser} />;
+  }
 
   return (
     <div className="app-container">
@@ -24,24 +38,19 @@ function App() {
           <span className="logo-text">ELITE PLACEMENTS</span>
         </div>
 
-        <div className="role-switcher">
-          <button
-            className={role === 'STUDENT' ? 'active' : ''}
-            onClick={() => setRole('STUDENT')}
-          >
-            Student View
-          </button>
-          <button
-            className={role === 'COMPANY' ? 'active' : ''}
-            onClick={() => setRole('COMPANY')}
-          >
-            Company Portal
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+          <div className="user-info" style={{ textAlign: 'right' }}>
+            <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>{user.name}</p>
+            <p style={{ fontSize: '0.75rem', opacity: 0.6 }}>{user.role} Portal</p>
+          </div>
+          <button className="secondary" onClick={handleLogout} style={{ padding: '0.5rem 1rem' }}>
+            Logout
           </button>
         </div>
       </nav>
 
       <main className="main-content">
-        {role === 'STUDENT' ? (
+        {user.role === 'STUDENT' ? (
           <StudentDashboard service={service} />
         ) : (
           <CompanyPortal service={service} />
@@ -49,7 +58,7 @@ function App() {
       </main>
 
       <footer className="footer">
-        <p>© 2026 Elite Placements • All-in-One Recruitment Solution</p>
+        <p>© 2026 Elite Placements • Enterprise Recruitment Solution</p>
       </footer>
     </div>
   );

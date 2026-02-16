@@ -1,21 +1,29 @@
 import { useState, useMemo } from 'react';
-import { mockDrives, mockStudent } from '../mockData';
+import { mockStudent } from '../mockData';
 import type { PlacementDrive } from '../domain/models';
 import { DriveStatus } from '../domain/models';
 import { PlacementService } from '../services/placement.service';
 import { AnalyticsEngine } from '../engines/analytics-engine/evaluator';
 
 const CompanyPortal = ({ service }: { service: PlacementService }) => {
-    const [drives, setDrives] = useState<PlacementDrive[]>(mockDrives);
+    // Load existing drives from service instead of just mock
+    const [drives, setDrives] = useState<PlacementDrive[]>(service.getApplicationsForDrive('').length > 0 ? [] : []);
     const [isCreating, setIsCreating] = useState(false);
     const [activeDriveId, setActiveDriveId] = useState<string | null>(null);
     const [showLogs, setShowLogs] = useState(false);
 
-    // New Drive State
+    // Initial load workaround for demo
+    useMemo(() => {
+        // This is a hack for the demo to show existing drives in the portal state
+        setDrives(service.getApplicationsForDrive('').map(a => service.getDrive(a.driveId)!).filter((v, i, a) => v && a.findIndex(t => (t.id === v.id)) === i));
+    }, [service]);
+
     const [newDrive, setNewDrive] = useState<Partial<PlacementDrive>>({
-        companyId: 'ELITE_ORG',
+        companyId: 'COMP_001',
+        companyName: 'TechNova Solutions',
         roleTitle: '',
         description: '',
+        requiredSkills: [],
         eligibilityRules: [],
         scoringWeights: [
             { attribute: 'cgpa', weight: 0.6 },
@@ -37,12 +45,14 @@ const CompanyPortal = ({ service }: { service: PlacementService }) => {
         setIsCreating(false);
     };
 
-    const activeDrive = useMemo(() => drives.find(d => d.id === activeDriveId), [drives, activeDriveId]);
+    const activeDrive = useMemo(() => {
+        // Check service first, then local state
+        return service.getDrive(activeDriveId || '') || drives.find(d => d.id === activeDriveId);
+    }, [drives, activeDriveId, service]);
+
     const applications = useMemo(() => activeDriveId ? service.getApplicationsForDrive(activeDriveId) : [], [activeDriveId, service]);
 
-    // Analytics
     const funnel = useMemo(() => AnalyticsEngine.getFunnel(applications), [applications]);
-    const biasReport = useMemo(() => AnalyticsEngine.detectBias(applications, [mockStudent], 'branch'), [applications]);
 
     if (activeDriveId && activeDrive) {
         return (
@@ -53,8 +63,8 @@ const CompanyPortal = ({ service }: { service: PlacementService }) => {
                     <div className="glass-card">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                             <div>
-                                <h2>Candidate Ranking</h2>
-                                <p style={{ opacity: 0.6 }}>Sorted by weighted composite score</p>
+                                <h2>{activeDrive.roleTitle} @ {activeDrive.companyName}</h2>
+                                <p style={{ opacity: 0.6 }}>Candidate Tracking & Ranking</p>
                             </div>
                             <button className="secondary" onClick={() => setShowLogs(!showLogs)}>
                                 {showLogs ? 'Hide Audit Logs' : 'View Governance Logs'}
@@ -102,7 +112,7 @@ const CompanyPortal = ({ service }: { service: PlacementService }) => {
                                             <span className="tag" style={{ background: app.currentStatus === 'ELIGIBLE' ? 'var(--success)' : 'var(--primary)' }}>{app.currentStatus}</span>
                                         </td>
                                         <td style={{ padding: '1rem' }}>
-                                            <button className="tag" style={{ border: 'none', cursor: 'pointer' }} onClick={() => service.shortlistCandidates(activeDrive.id, [app.studentId])}>Shortlist</button>
+                                            <button className="tag" onClick={() => service.shortlistCandidates(activeDrive.id || '', [app.studentId])}>Shortlist</button>
                                         </td>
                                     </tr>
                                 ))}
@@ -120,15 +130,6 @@ const CompanyPortal = ({ service }: { service: PlacementService }) => {
                                 </div>
                             ))}
                         </div>
-
-                        <hr style={{ margin: '1.5rem 0', opacity: 0.1 }} />
-
-                        <h3>Fairness Monitor</h3>
-                        <div style={{ marginTop: '1rem', padding: '1rem', borderRadius: '8px', background: biasReport.isDisproportionate ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)' }}>
-                            <p style={{ fontSize: '0.8rem', color: biasReport.isDisproportionate ? 'var(--error)' : 'var(--success)' }}>
-                                {biasReport.recommendation}
-                            </p>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -140,7 +141,7 @@ const CompanyPortal = ({ service }: { service: PlacementService }) => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <h1>Corporate Command Center</h1>
                 <button onClick={() => setIsCreating(!isCreating)}>
-                    {isCreating ? 'Exit Form' : '+ New Enterprise Drive'}
+                    {isCreating ? 'Exit Form' : '+ Create Enterprise Drive'}
                 </button>
             </div>
 
@@ -150,24 +151,20 @@ const CompanyPortal = ({ service }: { service: PlacementService }) => {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '1.5rem' }}>
                         <div>
                             <label>Role</label>
-                            <input className="glass-card" style={{ width: '100%', padding: '0.5rem' }} placeholder="Lead Software Engineer" onChange={e => setNewDrive({ ...newDrive, roleTitle: e.target.value })} />
+                            <input className="glass-card" style={{ width: '100%', padding: '0.5rem', color: 'white' }} placeholder="Lead Software Engineer" onChange={e => setNewDrive({ ...newDrive, roleTitle: e.target.value })} />
                         </div>
                         <div>
-                            <label>Scoring Weights (Total 1.0)</label>
-                            <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                <input type="number" step="0.1" style={{ width: '100px' }} placeholder="CGPA" defaultValue="0.6" />
-                                <input type="number" step="0.1" style={{ width: '100px' }} placeholder="Skills" defaultValue="0.4" />
-                            </div>
+                            <label>Required Skills (Comma separated)</label>
+                            <input className="glass-card" style={{ width: '100%', padding: '0.5rem', color: 'white' }} placeholder="React, Node.js, Python" onChange={e => setNewDrive({ ...newDrive, requiredSkills: e.target.value.split(',').map(s => s.trim()) })} />
                         </div>
-                    </div>
-
-                    <div style={{ marginTop: '2rem' }}>
-                        <h3>Governance Binding</h3>
-                        <p style={{ fontSize: '0.8rem', opacity: 0.6 }}>This drive will be bound to Eligibility Engine v1.0 and Governance Policy ERP-22.</p>
+                        <div style={{ gridColumn: 'span 2' }}>
+                            <label>Description</label>
+                            <textarea className="glass-card" style={{ width: '100%', padding: '0.5rem', color: 'white', minHeight: '100px' }} placeholder="Drive description..." onChange={e => setNewDrive({ ...newDrive, description: e.target.value })} />
+                        </div>
                     </div>
 
                     <button style={{ marginTop: '2.5rem', width: '100%', background: 'var(--primary)' }} onClick={handleCreate}>
-                        Initialize & Freeze Version
+                        Initialize & Version Drive
                     </button>
                 </div>
             ) : (
@@ -176,11 +173,13 @@ const CompanyPortal = ({ service }: { service: PlacementService }) => {
                         <div key={drive.id} className="glass-card drive-card">
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span className="tag" style={{ border: '1px solid var(--primary)' }}>v{drive.version || 1.0}</span>
-                                <span style={{ opacity: 0.5 }}>{drive.id}</span>
+                                <span style={{ opacity: 0.5 }}>{drive.companyName}</span>
                             </div>
                             <h3 style={{ marginTop: '1rem' }}>{drive.roleTitle}</h3>
-                            <p style={{ fontSize: '0.8rem', margin: '0.5rem 0' }}>{drive.description}</p>
-                            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                            <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.5rem' }}>
+                                {drive.requiredSkills?.map(s => <span key={s} className="tag secondary" style={{ fontSize: '0.6rem' }}>{s}</span>)}
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem' }}>
                                 <button className="secondary" style={{ flex: 1 }} onClick={() => setActiveDriveId(drive.id)}>Recruit Dashboard</button>
                             </div>
                         </div>

@@ -1,26 +1,27 @@
-import type { StudentProfile, PlacementDrive } from './domain/models';
-import { DriveStatus } from './domain/models';
+import { StudentProfile, PlacementDrive, DriveStatus } from './domain/models';
 
 export const mockStudent: StudentProfile = {
-    id: 'S101',
+    id: 'STU_001',
     name: 'Alice Smith',
-    email: 'alice@example.com',
-    cgpa: 8.5,
-    branch: 'CSE',
-    graduation_year: 2025,
+    email: 'alice.smith@university.edu',
+    cgpa: 9.2,
+    branch: 'Computer Science',
+    graduation_year: 2024,
     backlog_count: 0,
-    skills: ['React', 'TypeScript', 'Node.js'],
-    resume_url: 'http://example.com/alice_cv.pdf'
+    skills: ['Python', 'React', 'TypeScript', 'Node.js'],
+    resume_url: 'https://university.edu/resumes/alice_smith.pdf'
 };
 
 export const mockDrives: PlacementDrive[] = [
     {
-        id: 'D001',
-        companyId: 'TECH_CORP',
-        roleTitle: 'Software Engineer Intern',
-        description: 'Join the infrastructure team building scalable cloud solutions.',
+        id: 'DRIVE_001',
+        companyId: 'COMP_001',
+        companyName: 'TechNova Solutions',
+        roleTitle: 'Software Development Engineer (SDE-1)',
+        description: 'Design and develop scalable web applications using modern stacks.',
+        requiredSkills: ['React', 'TypeScript', 'Node.js'],
         eligibilityRules: [
-            { id: 'R1', field: 'cgpa', operator: 'gte', value: 8.0, label: 'Min CGPA' },
+            { id: 'R1', field: 'cgpa', operator: 'gte', value: 7.5, label: 'Min CGPA' },
             { id: 'R2', field: 'backlog_count', operator: 'eq', value: 0, label: 'Zero Backlogs' }
         ],
         selectionRounds: [
@@ -34,15 +35,17 @@ export const mockDrives: PlacementDrive[] = [
     {
         id: 'DRIVE_002',
         companyId: 'COMP_002',
-        roleTitle: 'Product Manager Intern',
-        description: 'Driving product strategy and user research for our core mobile app.',
+        companyName: 'DataSphere AI',
+        roleTitle: 'Data Engineer Intern',
+        description: 'Build robust data pipelines and optimize ETL processes.',
+        requiredSkills: ['Python', 'SQL', 'Spark'],
         eligibilityRules: [
             { id: 'R3', field: 'cgpa', operator: 'gte', value: 8.5, label: 'High CGPA' },
-            { id: 'R4', field: 'skills', operator: 'contains_any', value: ['Product Management', 'SQL'], label: 'PM Skills' }
+            { id: 'R4', field: 'skills', operator: 'contains_any', value: ['Python', 'SQL'], label: 'Core Skills' }
         ],
         selectionRounds: [
-            { id: 'Round_1', name: 'Case Study', order: 1 },
-            { id: 'Round_2', name: 'HR Interview', order: 2 }
+            { id: 'Round_1', name: 'Coding Challenge', order: 1 },
+            { id: 'Round_2', name: 'Systems Interview', order: 2 }
         ],
         status: DriveStatus.OPEN,
         version: 1,
