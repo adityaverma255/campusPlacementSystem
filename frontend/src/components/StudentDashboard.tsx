@@ -144,6 +144,15 @@ const StudentDashboard = ({ service }: { service: PlacementService }) => {
                                         <div className="tag" style={{ background: 'var(--primary)', color: 'white' }}>{app.currentStatus}</div>
                                     </div>
 
+                                    {/* Offer Letter / Success Card */}
+                                    {app.currentStatus === 'SELECTED' && (
+                                        <div className="glass-card" style={{ marginTop: '1.5rem', background: 'linear-gradient(135deg, rgba(74, 222, 128, 0.2), rgba(34, 197, 94, 0.1))', border: '1px solid var(--success)' }}>
+                                            <h3 style={{ color: 'var(--success)' }}>🎉 Congratulations!</h3>
+                                            <p style={{ margin: '0.5rem 0', fontSize: '0.9rem' }}>You have successfully cleared all selection rounds for <strong>{drive?.roleTitle}</strong>.</p>
+                                            <button style={{ background: 'var(--success)', marginTop: '1rem', width: 'auto' }}>Download Offer Letter</button>
+                                        </div>
+                                    )}
+
                                     {/* Progress Matrix */}
                                     <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
                                         {app.roundProgress.map((round, idx) => (

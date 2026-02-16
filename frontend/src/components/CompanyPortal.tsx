@@ -134,10 +134,35 @@ const CompanyPortal = ({ service }: { service: PlacementService }) => {
         <div className="fade-in">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <h1>Recruiter Hub</h1>
-                <button onClick={() => setIsCreating(!isCreating)}>
-                    {isCreating ? 'Cancel' : '+ Create Placement Drive'}
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button className="secondary" onClick={() => { localStorage.clear(); window.location.reload(); }}>Reset Demo</button>
+                    <button onClick={() => setIsCreating(!isCreating)}>
+                        {isCreating ? 'Cancel' : '+ Create Placement Drive'}
+                    </button>
+                </div>
             </div>
+
+            {/* Analytics Ribbon */}
+            {!isCreating && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
+                    <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
+                        <p style={{ opacity: 0.6, fontSize: '0.75rem' }}>Total Drives</p>
+                        <h2 style={{ color: 'var(--primary)' }}>{drives.length}</h2>
+                    </div>
+                    <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
+                        <p style={{ opacity: 0.6, fontSize: '0.75rem' }}>Active Candidates</p>
+                        <h2 style={{ color: 'var(--success)' }}>{mockStudent ? '1+' : '0'}</h2>
+                    </div>
+                    <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
+                        <p style={{ opacity: 0.6, fontSize: '0.75rem' }}>Selections</p>
+                        <h2 style={{ color: '#fbbf24' }}>{drives.reduce((acc, d) => acc + service.getEligibleStudents(d.id).filter(a => a.currentStatus === 'SELECTED').length, 0)}</h2>
+                    </div>
+                    <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
+                        <p style={{ opacity: 0.6, fontSize: '0.75rem' }}>Avg. Placement %</p>
+                        <h2 style={{ color: 'var(--text-secondary)' }}>85%</h2>
+                    </div>
+                </div>
+            )}
 
             {isCreating ? (
                 <div className="glass-card fade-in">

@@ -10,8 +10,25 @@ export class PlacementService {
     private drives: PlacementDrive[] = [];
     private applications: Application[] = [];
 
+    constructor() {
+        this.loadFromStorage();
+    }
+
+    private saveToStorage(): void {
+        localStorage.setItem('elite_drives', JSON.stringify(this.drives));
+        localStorage.setItem('elite_applications', JSON.stringify(this.applications));
+    }
+
+    private loadFromStorage(): void {
+        const d = localStorage.getItem('elite_drives');
+        const a = localStorage.getItem('elite_applications');
+        if (d) this.drives = JSON.parse(d);
+        if (a) this.applications = JSON.parse(a);
+    }
+
     createDrive(drive: PlacementDrive): PlacementDrive {
         this.drives.push(drive);
+        this.saveToStorage();
         return drive;
     }
 
@@ -35,6 +52,7 @@ export class PlacementService {
         };
 
         this.applications.push(application);
+        this.saveToStorage();
         return application;
     }
 
@@ -50,6 +68,7 @@ export class PlacementService {
                 app.currentStatus = ApplicationStatus.SHORTLISTED;
             }
         });
+        this.saveToStorage();
     }
 
     updateRoundStatus(applicationId: string, roundId: string, status: 'PASSED' | 'FAILED', feedback: string): void {
@@ -71,6 +90,7 @@ export class PlacementService {
                 application.currentStatus = ApplicationStatus.SELECTED;
             }
         }
+        this.saveToStorage();
     }
 
     getDrive(driveId: string): PlacementDrive | undefined {
