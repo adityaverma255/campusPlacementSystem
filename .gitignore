@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+*.js
+!test_full_flow.ts
+!test_evaluator.ts
+
+# Misc
+.DS_Store
+.env
+tsconfig.tsbuildinfo
