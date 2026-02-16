@@ -26,8 +26,39 @@ export enum DriveStatus {
 
 export interface SelectionRound {
     id: string;
-    name: string; // e.g., "Aptitude Test"
+    name: string;
     order: number;
+    slots?: ScheduleSlot[];
+}
+
+export interface WeightConfig {
+    attribute: string;
+    weight: number; // 0 to 1
+}
+
+export interface PreScreeningQuestion {
+    id: string;
+    text: string;
+    type: 'MCQ' | 'BOOL' | 'NUMERIC';
+    options?: string[];
+    expectedValue: any;
+}
+
+export interface ScheduleSlot {
+    id: string;
+    startTime: string;
+    endTime: string;
+    isBooked: boolean;
+    candidateId?: string;
+}
+
+export interface AuditLog {
+    id: string;
+    timestamp: string;
+    actor: string;
+    action: string;
+    targetId: string;
+    metadata: any;
 }
 
 export interface PlacementDrive {
@@ -38,6 +69,16 @@ export interface PlacementDrive {
     eligibilityRules: EligibilityRule[];
     selectionRounds: SelectionRound[];
     status: DriveStatus;
+
+    // SECTION 1: Scoring Config
+    scoringWeights?: WeightConfig[];
+
+    // SECTION 3: Screening
+    screeningQuestions?: PreScreeningQuestion[];
+
+    // SECTION 9: Governance
+    version: number;
+    isFrozen: boolean;
 }
 
 /**
@@ -56,6 +97,15 @@ export interface RoundStatus {
     roundId: string;
     status: 'PENDING' | 'PASSED' | 'FAILED';
     feedback: string;
+    scheduledSlotId?: string;
+}
+
+export interface ScoreBreakdown {
+    attribute: string;
+    score: number;
+    weight: number;
+    weightedScore: number;
+    explanation: string;
 }
 
 export interface Application {
@@ -63,6 +113,17 @@ export interface Application {
     studentId: string;
     driveId: string;
     currentStatus: ApplicationStatus;
-    eligibilityExplanation?: any; // Stores the RuleEvaluationResult[]
+
+    // Explanations
+    eligibilityExplanation?: any;
+    scoringExplanation?: ScoreBreakdown[];
+    screeningExplanation?: string[];
+
+    // Data
     roundProgress: RoundStatus[];
+    screeningResponses?: Record<string, any>;
+    compositeScore?: number;
+
+    // Governance
+    versionAppliedTo: number;
 }

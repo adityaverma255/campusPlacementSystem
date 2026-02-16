@@ -2,37 +2,33 @@ import { useState, useMemo } from 'react';
 import { mockDrives, mockStudent } from '../mockData';
 import type { PlacementDrive } from '../domain/models';
 import { DriveStatus } from '../domain/models';
-import type { EligibilityRule, Operator } from '../engines/rule-engine/types';
 import { PlacementService } from '../services/placement.service';
+import { AnalyticsEngine } from '../engines/analytics-engine/evaluator';
 
 const CompanyPortal = ({ service }: { service: PlacementService }) => {
     const [drives, setDrives] = useState<PlacementDrive[]>(mockDrives);
     const [isCreating, setIsCreating] = useState(false);
     const [activeDriveId, setActiveDriveId] = useState<string | null>(null);
+    const [showLogs, setShowLogs] = useState(false);
 
     // New Drive State
     const [newDrive, setNewDrive] = useState<Partial<PlacementDrive>>({
-        companyId: 'NEW_ORG',
+        companyId: 'ELITE_ORG',
         roleTitle: '',
         description: '',
         eligibilityRules: [],
-        selectionRounds: [
-            { id: 'R1', name: 'Aptitude', order: 1 },
-            { id: 'R2', name: 'Technical', order: 2 }
+        scoringWeights: [
+            { attribute: 'cgpa', weight: 0.6 },
+            { attribute: 'skills', weight: 0.4 }
         ],
-        status: DriveStatus.OPEN
+        selectionRounds: [
+            { id: 'Round_1', name: 'Aptitude', order: 1 },
+            { id: 'Round_2', name: 'Technical', order: 2 }
+        ],
+        status: DriveStatus.OPEN,
+        version: 1,
+        isFrozen: false
     });
-
-    const addRule = () => {
-        const rule: EligibilityRule = {
-            id: `RULE_${Date.now()}`,
-            field: 'cgpa',
-            operator: 'gte',
-            value: 7.0,
-            label: 'New Rule'
-        };
-        setNewDrive({ ...newDrive, eligibilityRules: [...(newDrive.eligibilityRules || []), rule] });
-    };
 
     const handleCreate = () => {
         const drive = { ...newDrive, id: `DRIVE_${Date.now()}` } as PlacementDrive;
@@ -42,88 +38,97 @@ const CompanyPortal = ({ service }: { service: PlacementService }) => {
     };
 
     const activeDrive = useMemo(() => drives.find(d => d.id === activeDriveId), [drives, activeDriveId]);
-    const applications = useMemo(() => activeDriveId ? service.getEligibleStudents(activeDriveId) : [], [activeDriveId, service]);
+    const applications = useMemo(() => activeDriveId ? service.getApplicationsForDrive(activeDriveId) : [], [activeDriveId, service]);
+
+    // Analytics
+    const funnel = useMemo(() => AnalyticsEngine.getFunnel(applications), [applications]);
+    const biasReport = useMemo(() => AnalyticsEngine.detectBias(applications, [mockStudent], 'branch'), [applications]);
 
     if (activeDriveId && activeDrive) {
         return (
             <div className="fade-in">
                 <button className="secondary" style={{ marginBottom: '1rem' }} onClick={() => setActiveDriveId(null)}>← Back to Dashboard</button>
-                <div className="glass-card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2rem' }}>
-                        <h2>{activeDrive.roleTitle} - Candidate Management</h2>
-                        <button
-                            className="secondary"
-                            onClick={() => {
-                                applications.forEach(app => {
-                                    const pendingRound = app.roundProgress.find(r => r.status === 'PENDING');
-                                    if (pendingRound) service.updateRoundStatus(app.id, pendingRound.roundId, 'PASSED', 'Bulk Shortlist');
-                                });
-                                setDrives([...drives]);
-                            }}
-                        >
-                            Advance All to Next Round
-                        </button>
-                    </div>
-                    <div style={{ marginTop: '2rem' }}>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '1.5rem' }}>
+                    <div className="glass-card">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                            <div>
+                                <h2>Candidate Ranking</h2>
+                                <p style={{ opacity: 0.6 }}>Sorted by weighted composite score</p>
+                            </div>
+                            <button className="secondary" onClick={() => setShowLogs(!showLogs)}>
+                                {showLogs ? 'Hide Audit Logs' : 'View Governance Logs'}
+                            </button>
+                        </div>
+
+                        {showLogs && (
+                            <div className="glass-card" style={{ marginBottom: '1.5rem', background: 'rgba(0,0,0,0.2)', fontSize: '0.8rem' }}>
+                                <h3>Governance Audit Trail</h3>
+                                <div style={{ maxHeight: '200px', overflowY: 'auto', marginTop: '1rem' }}>
+                                    {service.getGovernance().getAuditLogs(activeDrive.id).map(log => (
+                                        <div key={log.id} style={{ padding: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <span style={{ color: 'var(--primary)' }}>[{log.timestamp}]</span> {log.action} by {log.actor}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--glass-border)' }}>
                                     <th style={{ padding: '1rem' }}>Candidate</th>
+                                    <th style={{ padding: '1rem' }}>Composite Score</th>
                                     <th style={{ padding: '1rem' }}>Status</th>
-                                    <th style={{ padding: '1rem' }}>Progress</th>
                                     <th style={{ padding: '1rem' }}>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {applications.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={4} style={{ padding: '2rem', textAlign: 'center' }}>No candidates yet.</td>
+                                {applications.sort((a, b) => (b.compositeScore || 0) - (a.compositeScore || 0)).map(app => (
+                                    <tr key={app.id} style={{ borderBottom: '1px solid var(--glass-border)' }}>
+                                        <td style={{ padding: '1rem' }}>
+                                            <p style={{ fontWeight: 600 }}>{mockStudent.name}</p>
+                                            <p style={{ fontSize: '0.75rem', opacity: 0.6 }}>{app.id}</p>
+                                        </td>
+                                        <td style={{ padding: '1rem' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <div style={{ width: '100px', height: '8px', background: 'var(--glass-bg)', borderRadius: '4px' }}>
+                                                    <div style={{ width: `${app.compositeScore}%`, height: '100%', background: 'var(--primary)', borderRadius: '4px' }}></div>
+                                                </div>
+                                                <span>{app.compositeScore?.toFixed(1)}%</span>
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '1rem' }}>
+                                            <span className="tag" style={{ background: app.currentStatus === 'ELIGIBLE' ? 'var(--success)' : 'var(--primary)' }}>{app.currentStatus}</span>
+                                        </td>
+                                        <td style={{ padding: '1rem' }}>
+                                            <button className="tag" style={{ border: 'none', cursor: 'pointer' }} onClick={() => service.shortlistCandidates(activeDrive.id, [app.studentId])}>Shortlist</button>
+                                        </td>
                                     </tr>
-                                ) : (
-                                    applications.map(app => (
-                                        <tr key={app.id} style={{ borderBottom: '1px solid var(--glass-border)' }}>
-                                            <td style={{ padding: '1rem' }}>
-                                                <p style={{ fontWeight: 600 }}>{mockStudent.name}</p>
-                                                <p style={{ fontSize: '0.75rem', opacity: 0.7 }}>{app.studentId}</p>
-                                            </td>
-                                            <td style={{ padding: '1rem' }}>
-                                                <span className="tag" style={{ background: 'var(--primary)', color: 'white' }}>{app.currentStatus}</span>
-                                            </td>
-                                            <td style={{ padding: '1rem' }}>
-                                                <div style={{ display: 'flex', gap: '4px' }}>
-                                                    {app.roundProgress.map((r, i) => (
-                                                        <div key={i} title={r.roundId} style={{
-                                                            width: '12px', height: '12px', borderRadius: '2px',
-                                                            background: r.status === 'PASSED' ? 'var(--success)' : (r.status === 'FAILED' ? 'var(--error)' : 'var(--glass-border)')
-                                                        }} />
-                                                    ))}
-                                                </div>
-                                            </td>
-                                            <td style={{ padding: '1rem' }}>
-                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                    {app.roundProgress.some(r => r.status === 'PENDING') && (
-                                                        <button
-                                                            className="tag"
-                                                            style={{ background: 'var(--success)', border: 'none', cursor: 'pointer' }}
-                                                            onClick={() => {
-                                                                const pendingRound = app.roundProgress.find(r => r.status === 'PENDING');
-                                                                if (pendingRound) {
-                                                                    service.updateRoundStatus(app.id, pendingRound.roundId, 'PASSED', 'Automated Pass');
-                                                                    setActiveDriveId(activeDriveId); // Force re-render
-                                                                    setDrives([...drives]); // Force re-render
-                                                                }
-                                                            }}
-                                                        >
-                                                            Advance
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
+                                ))}
                             </tbody>
                         </table>
+                    </div>
+
+                    <div className="glass-card side-analytics">
+                        <h3>Funnel Intelligence</h3>
+                        <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            {Object.entries(funnel).map(([key, val]) => (
+                                <div key={key} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span style={{ opacity: 0.7 }}>{key}</span>
+                                    <span style={{ fontWeight: 600 }}>{val}</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        <hr style={{ margin: '1.5rem 0', opacity: 0.1 }} />
+
+                        <h3>Fairness Monitor</h3>
+                        <div style={{ marginTop: '1rem', padding: '1rem', borderRadius: '8px', background: biasReport.isDisproportionate ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)' }}>
+                            <p style={{ fontSize: '0.8rem', color: biasReport.isDisproportionate ? 'var(--error)' : 'var(--success)' }}>
+                                {biasReport.recommendation}
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -133,144 +138,50 @@ const CompanyPortal = ({ service }: { service: PlacementService }) => {
     return (
         <div className="fade-in">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                <h1>Recruiter Hub</h1>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button className="secondary" onClick={() => { localStorage.clear(); window.location.reload(); }}>Reset Demo</button>
-                    <button onClick={() => setIsCreating(!isCreating)}>
-                        {isCreating ? 'Cancel' : '+ Create Placement Drive'}
-                    </button>
-                </div>
+                <h1>Corporate Command Center</h1>
+                <button onClick={() => setIsCreating(!isCreating)}>
+                    {isCreating ? 'Exit Form' : '+ New Enterprise Drive'}
+                </button>
             </div>
-
-            {/* Analytics Ribbon */}
-            {!isCreating && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
-                    <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
-                        <p style={{ opacity: 0.6, fontSize: '0.75rem' }}>Total Drives</p>
-                        <h2 style={{ color: 'var(--primary)' }}>{drives.length}</h2>
-                    </div>
-                    <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
-                        <p style={{ opacity: 0.6, fontSize: '0.75rem' }}>Active Candidates</p>
-                        <h2 style={{ color: 'var(--success)' }}>{mockStudent ? '1+' : '0'}</h2>
-                    </div>
-                    <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
-                        <p style={{ opacity: 0.6, fontSize: '0.75rem' }}>Selections</p>
-                        <h2 style={{ color: '#fbbf24' }}>{drives.reduce((acc, d) => acc + service.getEligibleStudents(d.id).filter(a => a.currentStatus === 'SELECTED').length, 0)}</h2>
-                    </div>
-                    <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
-                        <p style={{ opacity: 0.6, fontSize: '0.75rem' }}>Avg. Placement %</p>
-                        <h2 style={{ color: 'var(--text-secondary)' }}>85%</h2>
-                    </div>
-                </div>
-            )}
 
             {isCreating ? (
                 <div className="glass-card fade-in">
-                    <h2>Create Selection Drive</h2>
+                    <h2>Configuration: Enterprise Hiring Drive</h2>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '1.5rem' }}>
                         <div>
-                            <label>Role Title</label>
-                            <input
-                                className="glass-card"
-                                style={{ width: '100%', marginTop: '0.5rem', padding: '0.5rem' }}
-                                placeholder="e.g. SDE-1"
-                                onChange={e => setNewDrive({ ...newDrive, roleTitle: e.target.value })}
-                            />
+                            <label>Role</label>
+                            <input className="glass-card" style={{ width: '100%', padding: '0.5rem' }} placeholder="Lead Software Engineer" onChange={e => setNewDrive({ ...newDrive, roleTitle: e.target.value })} />
                         </div>
                         <div>
-                            <label>Company ID</label>
-                            <input
-                                className="glass-card"
-                                style={{ width: '100%', marginTop: '0.5rem', padding: '0.5rem' }}
-                                defaultValue="NEW_ORG"
-                                onChange={e => setNewDrive({ ...newDrive, companyId: e.target.value })}
-                            />
+                            <label>Scoring Weights (Total 1.0)</label>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <input type="number" step="0.1" style={{ width: '100px' }} placeholder="CGPA" defaultValue="0.6" />
+                                <input type="number" step="0.1" style={{ width: '100px' }} placeholder="Skills" defaultValue="0.4" />
+                            </div>
                         </div>
                     </div>
 
                     <div style={{ marginTop: '2rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3>Eligibility Rules</h3>
-                            <button className="secondary" onClick={addRule}>+ Add Rule</button>
-                        </div>
-
-                        <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                            {newDrive.eligibilityRules?.map((rule, idx) => (
-                                <div key={rule.id} className="glass-card" style={{ display: 'flex', gap: '1rem', alignItems: 'center', padding: '1rem' }}>
-                                    <select
-                                        style={{ background: 'var(--glass-bg)', color: 'white', border: 'none' }}
-                                        onChange={e => {
-                                            const rules = [...(newDrive.eligibilityRules || [])];
-                                            rules[idx].field = e.target.value;
-                                            setNewDrive({ ...newDrive, eligibilityRules: rules });
-                                        }}
-                                    >
-                                        <option value="cgpa">CGPA</option>
-                                        <option value="backlog_count">Backlogs</option>
-                                        <option value="graduation_year">Grad Year</option>
-                                    </select>
-
-                                    <select
-                                        style={{ background: 'var(--glass-bg)', color: 'white', border: 'none' }}
-                                        onChange={e => {
-                                            const rules = [...(newDrive.eligibilityRules || [])];
-                                            rules[idx].operator = e.target.value as Operator;
-                                            setNewDrive({ ...newDrive, eligibilityRules: rules });
-                                        }}
-                                    >
-                                        <option value="gte">&gt;=</option>
-                                        <option value="lte">&lt;=</option>
-                                        <option value="eq">==</option>
-                                    </select>
-
-                                    <input
-                                        type="number"
-                                        style={{ background: 'var(--glass-bg)', color: 'white', border: 'none', width: '60px' }}
-                                        onChange={e => {
-                                            const rules = [...(newDrive.eligibilityRules || [])];
-                                            rules[idx].value = parseFloat(e.target.value);
-                                            setNewDrive({ ...newDrive, eligibilityRules: rules });
-                                        }}
-                                    />
-
-                                    <button
-                                        className="secondary"
-                                        style={{ marginLeft: 'auto', padding: '0.2rem 0.5rem' }}
-                                        onClick={() => {
-                                            const rules = newDrive.eligibilityRules?.filter(r => r.id !== rule.id);
-                                            setNewDrive({ ...newDrive, eligibilityRules: rules });
-                                        }}
-                                    >
-                                        Remove
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
+                        <h3>Governance Binding</h3>
+                        <p style={{ fontSize: '0.8rem', opacity: 0.6 }}>This drive will be bound to Eligibility Engine v1.0 and Governance Policy ERP-22.</p>
                     </div>
 
-                    <button style={{ marginTop: '2.5rem', width: '100%', background: 'var(--success)' }} onClick={handleCreate}>
-                        Launch Drive & Start Accepting Applications
+                    <button style={{ marginTop: '2.5rem', width: '100%', background: 'var(--primary)' }} onClick={handleCreate}>
+                        Initialize & Freeze Version
                     </button>
                 </div>
             ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
                     {drives.map(drive => (
-                        <div key={drive.id} className="glass-card fade-in">
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                                <span className="tag tag-success">{drive.status}</span>
-                                <span style={{ color: 'var(--secondary)', fontSize: '0.8rem' }}>{drive.id}</span>
+                        <div key={drive.id} className="glass-card drive-card">
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span className="tag" style={{ border: '1px solid var(--primary)' }}>v{drive.version || 1.0}</span>
+                                <span style={{ opacity: 0.5 }}>{drive.id}</span>
                             </div>
-                            <h3>{drive.roleTitle}</h3>
-                            <p style={{ fontSize: '0.85rem', margin: '0.5rem 0' }}>{drive.eligibilityRules.length} Rules Attached</p>
-                            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-                                <button className="secondary" style={{ flex: 1 }}>Edit Drive</button>
-                                <button
-                                    className="secondary"
-                                    style={{ flex: 1, border: '1px solid var(--primary)' }}
-                                    onClick={() => setActiveDriveId(drive.id)}
-                                >
-                                    Candidates
-                                </button>
+                            <h3 style={{ marginTop: '1rem' }}>{drive.roleTitle}</h3>
+                            <p style={{ fontSize: '0.8rem', margin: '0.5rem 0' }}>{drive.description}</p>
+                            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                                <button className="secondary" style={{ flex: 1 }} onClick={() => setActiveDriveId(drive.id)}>Recruit Dashboard</button>
                             </div>
                         </div>
                     ))}

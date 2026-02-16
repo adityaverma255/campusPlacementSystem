@@ -24,24 +24,28 @@ export const mockDrives: PlacementDrive[] = [
             { id: 'R2', field: 'backlog_count', operator: 'eq', value: 0, label: 'Zero Backlogs' }
         ],
         selectionRounds: [
-            { id: 'RD1', name: 'Aptitude Test', order: 1 },
-            { id: 'RD2', name: 'Technical Interview', order: 2 }
+            { id: 'Round_1', name: 'Aptitude Test', order: 1 },
+            { id: 'Round_2', name: 'Technical Interview', order: 2 }
         ],
-        status: DriveStatus.OPEN
+        status: DriveStatus.OPEN,
+        version: 1,
+        isFrozen: false
     },
     {
-        id: 'D002',
-        companyId: 'NEBULA_AI',
-        roleTitle: 'AI Research Assistant',
-        description: 'Work on cutting-edge generative models and neural networks.',
+        id: 'DRIVE_002',
+        companyId: 'COMP_002',
+        roleTitle: 'Product Manager Intern',
+        description: 'Driving product strategy and user research for our core mobile app.',
         eligibilityRules: [
-            { id: 'R3', field: 'cgpa', operator: 'gte', value: 8.5, label: 'Min CGPA' },
-            { id: 'R4', field: 'skills', operator: 'contains_any', value: ['Python', 'PyTorch'], label: 'AI Skills' }
+            { id: 'R3', field: 'cgpa', operator: 'gte', value: 8.5, label: 'High CGPA' },
+            { id: 'R4', field: 'skills', operator: 'contains_any', value: ['Product Management', 'SQL'], label: 'PM Skills' }
         ],
         selectionRounds: [
-            { id: 'RD3', name: 'Math Quiz', order: 1 },
-            { id: 'RD4', name: 'Research Discussion', order: 2 }
+            { id: 'Round_1', name: 'Case Study', order: 1 },
+            { id: 'Round_2', name: 'HR Interview', order: 2 }
         ],
-        status: DriveStatus.OPEN
+        status: DriveStatus.OPEN,
+        version: 1,
+        isFrozen: false
     }
 ];
